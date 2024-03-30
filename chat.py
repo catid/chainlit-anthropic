@@ -26,9 +26,12 @@ async def call_claude(query: str):
     if not messages:
         messages = []
 
+    prompt = f"{prompt_history}{anthropic.HUMAN_PROMPT}{query}{anthropic.AI_PROMPT}"
+
     settings = {
         "max_tokens": 1024,
         "model": "claude-3-opus-20240229",
+        "system": "You are a helpful and knowledgeable C++ optimization assistant.  You mainly write C++ header/source files with CMakeLists.txt build scripts.  You always write the most optimized code, leveraging multi-threading and SIMD where possible.",
     }
 
     new_message = [
@@ -50,29 +53,30 @@ async def call_claude(query: str):
         async for text in stream.text_stream:
             print(text, end="", flush=True)
             ai_text += text
+            await cl.context.current_step.stream_token(text)
         print()
 
     # Only after accumulating the complete AI response, append it to `messages` and `prompt_history`.
     ai_message = [
         {
             "role": "assistant",
-            "content": ai_text
+            "content": cl.context.current_step.output
         }
     ]
 
     messages += ai_message
-    prompt_history += f"{anthropic.HUMAN_PROMPT}{query}{anthropic.AI_PROMPT}{ai_text}"
 
-    cl.user_session.set("prompt_history", prompt_history)
     cl.user_session.set("messages", messages)
 
     # Update the `cl.context.current_step.generation` with the final `ai_text`.
     cl.context.current_step.generation = cl.CompletionGeneration(
-        formatted=prompt_history,
-        completion=ai_text,
+        formatted=prompt,
+        completion=cl.context.current_step.output,
         settings=settings,
         provider=Anthropic.id,
     )
+
+    cl.user_session.set("prompt_history", prompt + cl.context.current_step.output)
 
 
 @cl.on_message
