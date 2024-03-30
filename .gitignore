@@ -1,1 +1,5 @@
 .env
+.chainlit
+chainlit.md
+__pycache__
+.vscode

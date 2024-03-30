@@ -21,33 +21,58 @@ async def start_chat():
 @cl.step(name="Claude", type="llm", root=True)
 async def call_claude(query: str):
     prompt_history = cl.user_session.get("prompt_history")
+    messages = cl.user_session.get("messages")
 
-    prompt = f"{prompt_history}{anthropic.HUMAN_PROMPT}{query}{anthropic.AI_PROMPT}"
+    if not messages:
+        messages = []
 
     settings = {
-        "stop_sequences": [anthropic.HUMAN_PROMPT],
-        "max_tokens_to_sample": 1000,
-        "model": "claude-2.0",
+        "max_tokens": 1024,
+        "model": "claude-3-opus-20240229",
     }
 
-    stream = await c.completions.create(
-        prompt=prompt,
-        stream=True,
+    new_message = [
+        {
+            "role": "user",
+            "content": query
+        }
+    ]
+
+    messages += new_message
+    print(f"Messages: {messages}")
+
+    ai_text = ""
+
+    async with c.messages.stream(
+        messages=messages,
         **settings,
-    )
+    ) as stream:
+        async for text in stream.text_stream:
+            print(text, end="", flush=True)
+            ai_text += text
+        print()
 
-    async for data in stream:
-        token = data.completion
-        await cl.context.current_step.stream_token(token)
+    # Only after accumulating the complete AI response, append it to `messages` and `prompt_history`.
+    ai_message = [
+        {
+            "role": "assistant",
+            "content": ai_text
+        }
+    ]
 
+    messages += ai_message
+    prompt_history += f"{anthropic.HUMAN_PROMPT}{query}{anthropic.AI_PROMPT}{ai_text}"
+
+    cl.user_session.set("prompt_history", prompt_history)
+    cl.user_session.set("messages", messages)
+
+    # Update the `cl.context.current_step.generation` with the final `ai_text`.
     cl.context.current_step.generation = cl.CompletionGeneration(
-        formatted=prompt,
-        completion=cl.context.current_step.output,
+        formatted=prompt_history,
+        completion=ai_text,
         settings=settings,
         provider=Anthropic.id,
     )
-
-    cl.user_session.set("prompt_history", prompt + cl.context.current_step.output)
 
 
 @cl.on_message

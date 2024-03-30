@@ -21,5 +21,11 @@ echo "ANTHROPIC_API_KEY=your_api_key" > .env
 Run the app:
 
 ```bash
-chainlit run
+chainlit run chat.py
 ```
+
+## Usage
+
+Browse to `http://localhost:8000` in your web browser.
+
+Type your message in the chat window and press enter. The app will generate a response using the Anthropic API.
