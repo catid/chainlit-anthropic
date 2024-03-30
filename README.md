@@ -29,3 +29,5 @@ chainlit run chat.py
 Browse to `http://localhost:8000` in your web browser.
 
 Type your message in the chat window and press enter. The app will generate a response using the Anthropic API.
+
+![Example output](example_output.png)
