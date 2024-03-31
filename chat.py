@@ -46,21 +46,24 @@ async def call_claude(query: str):
 
     ai_text = ""
 
-    async with c.messages.stream(
-        messages=messages,
-        **settings,
-    ) as stream:
-        async for text in stream.text_stream:
-            print(text, end="", flush=True)
-            ai_text += text
-            await cl.context.current_step.stream_token(text)
-        print()
+    try:
+        async with c.messages.stream(
+            messages=messages,
+            **settings,
+        ) as stream:
+            async for text in stream.text_stream:
+                print(text, end="", flush=True)
+                ai_text += text
+                await cl.context.current_step.stream_token(text)
+            print()
+    except cl.AbortException:
+        pass
 
     # Only after accumulating the complete AI response, append it to `messages` and `prompt_history`.
     ai_message = [
         {
             "role": "assistant",
-            "content": cl.context.current_step.output
+            "content": ai_text
         }
     ]
 
@@ -71,12 +74,12 @@ async def call_claude(query: str):
     # Update the `cl.context.current_step.generation` with the final `ai_text`.
     cl.context.current_step.generation = cl.CompletionGeneration(
         formatted=prompt,
-        completion=cl.context.current_step.output,
+        completion=ai_text,
         settings=settings,
         provider=Anthropic.id,
     )
 
-    cl.user_session.set("prompt_history", prompt + cl.context.current_step.output)
+    cl.user_session.set("prompt_history", prompt + ai_text)
 
 
 @cl.on_message
